@@ -60,7 +60,7 @@ public class ComputableModelController {
     @ApiOperation(value = "运行模型服务，提交task任务")
     public JsonResult invokeModel(@RequestBody TaskServiceDTO taskServiceDTO){
 
-        return ResultUtils.success(computableService.invokeModel(taskServiceDTO));
+        return ResultUtils.success(computableService.invokeModelPrepare(taskServiceDTO));
     }
 
     @RequestMapping(value = "/refreshTaskRecord", method = RequestMethod.POST)

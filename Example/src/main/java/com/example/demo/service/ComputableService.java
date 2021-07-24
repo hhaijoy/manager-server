@@ -3,10 +3,15 @@ package com.example.demo.service;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.example.demo.dao.ComputableModelDao;
+import com.example.demo.dao.RunTaskDao;
+import com.example.demo.dao.SubmittedTaskDao;
 import com.example.demo.domain.ComputableModel;
 import com.example.demo.domain.support.TaskNodeStatusInfo;
 import com.example.demo.dto.computableModel.*;
 import com.example.demo.dto.taskNode.TaskNodeReceiveDTO;
+import com.example.demo.entity.DataItem;
+import com.example.demo.entity.RunTask;
+import com.example.demo.entity.SubmittedTask;
 import com.example.demo.enums.ResultEnum;
 import com.example.demo.exception.MyException;
 import com.example.demo.sdk.*;
@@ -16,9 +21,14 @@ import org.apache.commons.codec.DecoderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.annotation.Resource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
@@ -37,6 +47,16 @@ public class ComputableService {
 
     @Autowired
     TaskNodeService taskNodeService;
+
+    @Autowired
+    RunTaskDao runTaskDao;
+
+    @Autowired
+    SubmittedTaskDao submittedTaskDao;
+
+    @Resource
+    private MongoTemplate mongoTemplate;
+
 
     private static final Logger log = LoggerFactory.getLogger(ComputableService.class);
 
@@ -206,6 +226,144 @@ public class ComputableService {
         }
         return null;
     }
+
+
+    /**
+     * 调用模型容器前需先把相同输入数据的任务合并成一个
+     * @author bin
+     * @date 2021/7/23
+     */
+    public JSONObject invokeModelPrepare(TaskServiceDTO taskServiceDTO){
+        // 需要先创建一个表来存储每个任务的信息
+        // PS:其实不需要submittedTask来存每个任务的信息，用runTask存运行的信息就可以了
+        /*SubmittedTask submittedTask = new SubmittedTask();
+        submittedTask.setIp(taskServiceDTO.getIp());
+        submittedTask.setPort(taskServiceDTO.getPort());
+        submittedTask.setSubmittedTaskId(UUID.randomUUID().toString());
+        submittedTask.setUserName(taskServiceDTO.getUsername());
+        submittedTask.setMd5(taskServiceDTO.getPid());
+        submittedTask.setStatus(0);
+        submittedTask.setRunTime(new Date());
+        submittedTask.setInputs(taskServiceDTO.getInputs());
+        submittedTaskDao.insert(submittedTask);*/
+        // 不太清楚OutputDataDTO类中的template是做什么用的，所以没有对传入的outputs做改动
+        JSONObject result = mergeTask(taskServiceDTO);
+
+        return result;
+
+    }
+
+    /**
+     * 合并输入数据相同的任务，有相同的任务则合并，没有的话将该任务放到RunTask表中
+     * 合并后数据相同的任务拥有相同的tid
+     * @author bin
+     * @date 2021/7/23
+     */
+    // TODO 未做ExDataDTO中urls属性的判断
+    public JSONObject mergeTask(TaskServiceDTO taskServiceDTO){//如有参数相同的提交任务，合并到同一个执行任务，没有则新建一个
+
+        String md5 = taskServiceDTO.getPid();
+
+        List<RunTask> runTaskList = runTaskDao.findAllByMd5AndStatusOrStatus(md5,0,1);
+
+        // 返回的数据
+        JSONObject result = new JSONObject();
+
+        if(runTaskList.size()!=0){
+            for(RunTask runTask:runTaskList){
+                if(compareTask(taskServiceDTO,runTask)==0){
+                    continue;
+                }else {
+                    // List<String> relateTaskIds = runTask.getRelatedTasks();
+
+                    // 合并的时候submittedTask需要更新如下字段
+                    // Update updateST = new Update();
+                    // updateST.set("runTaskId",runTask.getRunTaskId());
+                    // updateST.set("ip",runTask.getIp());
+                    // updateST.set("port",runTask.getPort());
+                    // mongoTemplate.updateFirst(
+                    //     Query.query(Criteria.where("submittedTaskId").is(submittedTask.getSubmittedTaskId())),
+                    //     updateST,
+                    //     SubmittedTask.class
+                    // );
+                    // submittedTask.setRunTaskId(runTask.getRunTaskId());
+                    // submittedTaskDao.save(submittedTask);
+
+                    // relateTaskIds.add(submittedTask.getSubmittedTaskId());
+                    //runtask的字段必须单独更新，否则可能出现并发覆盖之前的修改
+                    // Query query = Query.query(Criteria.where("runTaskId").is(runTask.getRunTaskId()));
+                    // Update update = new Update();
+                    // update.set("relatedTasks",relateTaskIds);
+                    // mongoTemplate.updateFirst(query, update, RunTask.class);
+
+                    result.put("tid",runTask.getRunTaskId());
+                    result.put("ip",runTask.getIp());
+                    result.put("port",runTask.getPort());
+
+                    return result;
+                }
+            }
+        }
+
+        //如果没有相同的，则新建
+        RunTask runTask = new RunTask();
+        // runTask.setRunTaskId(UUID.randomUUID().toString());
+        runTask.setIp(taskServiceDTO.getIp());
+        runTask.setPort(taskServiceDTO.getPort());
+        runTask.setMd5(taskServiceDTO.getPid());
+        runTask.setStatus(0);
+        runTask.setInputs(taskServiceDTO.getInputs());
+        // runTask.setOutputs(submittedTask.getOutputs());
+        // runTask与SubmittedTask进行关联
+        // runTask.getRelatedTasks().add(submittedTask.getSubmittedTaskId());
+        // runTask的id为调用TaskServer返回的tid
+        result = invokeModel(taskServiceDTO);
+        runTask.setRunTaskId(result.getString("tid"));
+
+        runTaskDao.insert(runTask);
+
+        // submittedTask.setRunTaskId(runTask.getRunTaskId());
+        // submittedTaskDao.save(submittedTask);
+        // mongoTemplate.updateFirst(
+        //     Query.query(Criteria.where("submittedTaskId").is(submittedTask.getSubmittedTaskId())),
+        //     (new Update()).set("runTaskId",runTask.getRunTaskId()),
+        //     SubmittedTask.class
+        // );
+
+        return result;
+
+    }
+
+    public int compareTask(TaskServiceDTO taskServiceDTO, RunTask runTask){
+        List<ExDataDTO> runInputs = runTask.getInputs();
+        List<ExDataDTO> submitInputs = taskServiceDTO.getInputs();
+
+        int flag;
+        for(ExDataDTO runInput:runInputs){
+            flag = 0;
+            String runEvent = runInput.getEvent();
+            String runData = runInput.getUrl();
+            for(ExDataDTO submitInput:submitInputs){
+                if(runEvent.equals(submitInput.getEvent())){
+                    // 判断提交的数据Url是否与默认的几个选项的Url相同
+                    if( runData.equals(submitInput.getUrl())){
+                        flag = 1;
+                        break;
+                    }else {
+                        return 0;
+                    }
+                }
+            }
+
+            if(flag==0){
+                return 0;
+            }
+        }
+
+        return 1;
+    }
+
+
     public JSONObject invokeModel(TaskServiceDTO taskServiceDTO){
         //利用taskServiceDTO拼凑提交任务的form表单，从而提交任务
         String ip = taskServiceDTO.getIp();
@@ -273,7 +431,13 @@ public class ComputableService {
                     return null;
                 }
                 String taskStatus = jData.getString("t_status");
-                taskResultDTO.setStatus(convertStatus(taskStatus));
+                int convertedStatus = convertStatus(taskStatus);
+                taskResultDTO.setStatus(convertedStatus);
+                // 更新runTask的状态
+                Query query = Query.query(Criteria.where("runTaskId").is(tid));
+                Update update = new Update();
+                update.set("status",convertedStatus);
+                mongoTemplate.updateFirst(query, update, RunTask.class);
                 taskResultDTO.setPid(jData.getString("t_pid"));
                 List<ExDataDTO> outputItems = new ArrayList<>();
                 if(jData.getJSONArray("t_outputs") != null){
