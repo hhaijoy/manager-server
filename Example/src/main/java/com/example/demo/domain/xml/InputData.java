@@ -16,4 +16,7 @@ public class InputData implements Serializable {
     @JacksonXmlProperty(localName = "DataConfiguration")
     @JacksonXmlElementWrapper(useWrapping = false)
     private ArrayList<DataTemplate> inputs;
+
+    @JacksonXmlProperty(localName = "Parameter")
+    private ArrayList<ActionParam> params;
 }

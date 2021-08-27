@@ -18,6 +18,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
+import javax.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -92,7 +95,19 @@ public class TaskNodeController {
 
     @RequestMapping(value = "/all", method = RequestMethod.GET)
     @ApiOperation(value = "get all TaskNode record")
-    JsonResult listAll(){
+    JsonResult listAll(HttpServletRequest request) throws IOException {
+        BufferedReader bufferedReader = request.getReader();
+        String str = "";
+        String inputLine;
+        try {
+            while ((inputLine = bufferedReader.readLine()) != null) {
+                str += inputLine;
+            }
+            bufferedReader.close();
+        } catch (IOException e) {
+            System.out.println("IOException: " + e);
+        }
+
         return ResultUtils.success(taskNodeService.listAll());
     }
 
@@ -135,7 +150,7 @@ public class TaskNodeController {
         if(response.size() != 0){
             return ResultUtils.success(response.get(0));
         }else{
-            return ResultUtils.success();
+            return ResultUtils.error(-1,"Can not find model service");
         }
     }
 

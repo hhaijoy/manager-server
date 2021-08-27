@@ -35,7 +35,7 @@ public class HelloWorld {
     @GetMapping("/hello")
     @ApiOperation(value = "Test Swagger")
     public String index(){
-        return "Hello World";
+        return "Hello World0.1.4";
     }
 
     @GetMapping("/book")

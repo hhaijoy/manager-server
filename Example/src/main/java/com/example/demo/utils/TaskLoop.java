@@ -13,6 +13,7 @@ import com.example.demo.sdk.Data;
 import com.example.demo.thread.DataServiceTask;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.dom4j.DocumentException;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.*;
@@ -86,9 +87,11 @@ public class TaskLoop {
     }
 
     public void initTaskRun(Task task){
+        task.setStatus(0);
         initDataFlow(task);
         iterationInit(task);
         initCondition(task);
+        taskDao.save(task);
     }
 
     /**
@@ -192,7 +195,7 @@ public class TaskLoop {
      * @param task
      * @return
      */
-    public int query(List<ModelAction> waitingModels,List<DataProcessing> waitingProcessings , Task task) throws IOException, URISyntaxException {
+    public int query(List<ModelAction> waitingModels,List<DataProcessing> waitingProcessings , Task task) throws IOException, URISyntaxException, DocumentException {
         int result = 0;
 
         for(int i=0;i<waitingModels.size();i++){
@@ -306,6 +309,8 @@ public class TaskLoop {
 
     public Map<String,Object> checkActions(Task task) throws IOException, URISyntaxException {
         Map<String,Object> result = new HashMap<>();
+        List<DataProcessing> dataProcessingList = task.getDataProcessings();
+        List<ModelAction> modelActionList = task.getModelActions();
         result.put("processing",checkProcessings(task));
         result.put("model",checkModels(task));
 
@@ -326,6 +331,7 @@ public class TaskLoop {
         List<DataProcessing> completedProcessing = new ArrayList<>();
         List<DataProcessing> runningProcessing = new ArrayList<>();
         List<DataProcessing> failedProcessing = new ArrayList<>();
+        List<DataProcessing> ignoreList = new ArrayList<>();
 
         if(task.getDataProcessings()!=null){
             DataProcessing dataProcessing = new DataProcessing();
@@ -371,7 +377,9 @@ public class TaskLoop {
                         }
                     }
                 }else if(dataProcessing.getType().equals("dataService")){
-                    if(dataProcessing.getStatus()==1){
+                    if(checkCondition(task,dataProcessing)==-1){//如果是个条件判断为false的任务，则不会去运行
+                        ignoreList.add(dataProcessing);
+                    }else if(dataProcessing.getStatus()==1){
                         addToSharedData(dataProcessing,task);
                         completedProcessing.add(dataProcessing);
                     }else if(dataProcessing.getStatus()==0){
@@ -381,6 +389,10 @@ public class TaskLoop {
                             waitingProcessing.add(dataProcessing);
                         }
                     }else if(dataProcessing.getStatus()==-1){
+                        updateFailedAction(dataProcessing);
+                        addToSharedData(dataProcessing,task);
+                        failedProcessing.add(dataProcessing);
+                    }else if(dataProcessing.getStatus()==2){
                         failedProcessing.add(dataProcessing);
                     }
                 }
@@ -392,7 +404,7 @@ public class TaskLoop {
 
 
         result.put("waiting",waitingProcessing);
-        result.put("running",completedProcessing);
+        result.put("running",runningProcessing);
         result.put("completed",completedProcessing);
         result.put("failed",failedProcessing);
 
@@ -419,13 +431,15 @@ public class TaskLoop {
         List<ModelAction> iModels = task.getI_modelActions();
         List<ModelAction> modelActionList = new ArrayList<>();
 
-        modelActionList.addAll(models);
+        if(models!=null){
+            modelActionList.addAll(models);
+        }
         if(iModels!=null){
             modelActionList.addAll(iModels);//两个list都要加进去
         }
 
         ModelAction modelAction = new ModelAction();
-        for(int i=0;i<modelActionList.size();i++){
+        for(int i=0;modelActionList!=null&&modelActionList.size()>0&&i<modelActionList.size();i++){
             modelAction = modelActionList.get(i);
             if(checkCondition(task,modelAction)==-1){//如果是个条件判断为false的模型任务，则不会去运行
                 ignoredModel.add(modelAction);
@@ -476,6 +490,15 @@ public class TaskLoop {
 
                             }else if(modelStatus == -1||modelStatus == 2){
                                 modelAction.setStatus(2);
+
+                                //进行运行失败处理
+                                updateFailedAction(modelAction);
+                                if(modelAction.getIterationNum()>1&&iterationCount.get(modelAction.getMd5())< modelAction.getIterationNum())//迭代模型且
+                                {
+                                    addToTempData(modelAction);//迭代和非迭代模型共享池不一样
+                                }else{
+                                    addToSharedData(modelAction,task);
+                                }
                                 failedModel.add(modelAction);
                             }else if(modelStatus == 0){
                                 runningModel.add(modelAction);
@@ -483,11 +506,14 @@ public class TaskLoop {
                         }
                     }else{
                         // 返回result为err，说明taskServer可能出问题了，因为查询不到记录,往外面抛出错误
+                        updateFailedAction(modelAction);
                         throw new IOException("task Server Error");
                     }
                 }else{
                     waitingModel.add(modelAction);
                 }
+            }else if(modelAction.getStatus()==2){
+                failedModel.add(modelAction);
             }
         }
 
@@ -683,6 +709,18 @@ public class TaskLoop {
         }
     }
 
+    //对运行失败的action的输出进行处理
+    private void updateFailedAction(Action action){
+        List<DataTemplate> outputs = action.getOutputData().getOutputs();
+        for (DataTemplate dataTemplate : outputs) {
+            dataTemplate.getDataContent().setValue("error");
+            dataTemplate.getDataContent().setType("Url");
+            dataTemplate.getDataContent().setFileName("error");
+            dataTemplate.getDataContent().setSuffix("");
+            dataTemplate.setPrepared(true);
+        }
+    }
+
     public Boolean finalCheck(Task task) throws IOException, URISyntaxException {
         Map<String,List<ModelAction>> modelActionList = (Map<String,List<ModelAction>>) checkActions(task).get("model");
         Map<String,List<DataProcessing>> DataProcessingList = (Map<String,List<DataProcessing>>) checkActions(task).get("processing");
@@ -694,7 +732,7 @@ public class TaskLoop {
         List<DataProcessing> failedProcessings = DataProcessingList.get("failed");
         List<DataProcessing> runningProcessings = DataProcessingList.get("running");
 
-        if(failedModelAction.size()==task.getModelActions().size()){//task的model全部失败，则整个task失败
+        if((task.getModelActions()!=null&&failedModelAction.size()==task.getModelActions().size())){//task的model全部失败，则整个task失败
             task.setStatus(-1);
             task.setFinish(new Date());
             taskDao.save(task);
@@ -753,12 +791,16 @@ public class TaskLoop {
     private boolean checkData(Action modelAction,Task task){//检查数据齐全，并把数据加到对应的input
         List<DataTemplate> inputsList = modelAction.getInputData().getInputs();
         for (DataTemplate template : inputsList) {
-            if(template.getDataContent().getType().equals("link")){
+            if(template.getDataContent().getType().equals("link")||template.getDataContent().getType().equals("mixed")){
                 String value = template.getDataContent().getLink();
                 if(sharedOutput == null||!sharedOutput.containsKey(value)){
                     template.setPrepared(false);
                     return false;
                 }else{
+                    if(sharedOutput.get(value).getValue().equals("error")){//说明上游数据错误
+                        modelAction.setStatus(2);
+                        return false;
+                    }
                     try{
                         linkDataFlow(template, modelAction, task);
                     }catch (IOException e){
@@ -767,7 +809,7 @@ public class TaskLoop {
                 }
             }
             else{
-                if (template.getDataContent().getValue()==null||template.getDataContent().getValue().equals("")){
+                if (template.getDataContent().getValue()==null||template.getDataContent().getValue().equals("")||template.getDataContent().getValue().equals("error")){
                     template.setPrepared(false);
                     modelAction.setStatus(2);//说明缺少数据，且无法配置
                     return false;
@@ -782,19 +824,23 @@ public class TaskLoop {
     private boolean checkDataServicePrepared(DataProcessing dataProcessing){
         List<DataTemplate> inputsList = dataProcessing.getInputData().getInputs();
         for (DataTemplate template : inputsList) {
-            if(template.getDataContent().getType().equals("link")){
+            if(template.getDataContent().getType().equals("link")||template.getDataContent().getType().equals("mixed")){
                 String value = template.getDataContent().getLink();
                 if(sharedOutput == null||!sharedOutput.containsKey(value)){
                     template.setPrepared(false);
                     return false;
                 }else{
+                    if(sharedOutput.get(value).getValue().equals("error")){//说明上游数据错误
+                        dataProcessing.setStatus(2);
+                        return false;
+                    }
                     template.getDataContent().setValue(sharedOutput.get(value).getValue());
                     template.getDataContent().setType(sharedOutput.get(value).getType());
                     template.setPrepared(true);
                 }
             }
             else{
-                if (template.getDataContent().getValue()==null||template.getDataContent().getValue().equals("")){
+                if (template.getDataContent().getValue()==null||template.getDataContent().getValue().equals("")||template.getDataContent().getValue().equals("error")){
                     template.setPrepared(false);
                     dataProcessing.setStatus(2);//说明缺少数据，且无法配置
                     return false;
@@ -892,9 +938,9 @@ public class TaskLoop {
 
         String value = template.getDataContent().getLink();//input所需要的output的id
         String urlStr = sharedOutput.get(value).getValue();
-        if(!checkConversion(task.getDataLink(),template.getDataId()).equals("0")){//转换数据
+//        if(!checkConversion(task.getDataLink(),template.getDataId()).equals("0")){//转换数据
 //            urlStr = convertData(urlStr,checkConversion(task.getDataLink(),template.getDataId()));
-        }
+//        }
 
         String type = sharedOutput.get(value).getType();
         if (urlStr.indexOf("[") != -1) {//如果这是一个多输出
@@ -998,7 +1044,7 @@ public class TaskLoop {
 
     /**
      * List中寻找对应的Action
-     * @param srcModelActionList
+     * @param srcActionList
      * @param id
      * @return
      */

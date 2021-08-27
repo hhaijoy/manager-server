@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -73,12 +74,14 @@ public class TaskConfigurationService {
 
     public String runTask(MultipartFile file, String userName){
         UUID taskId = UUID.randomUUID();
+        log.info("}}}}}}}"+taskId.toString());
         //解析xml文档
         try {
             TaskConfiguration taskConfiguration = XmlParseUtils.parseXmlBaseOnStream(file.getInputStream(),"UTF-8");
             //TODO 验证文档中是否存在具体的模型服务
             Task task = new Task();
             task.setUid(taskConfiguration.getUid());
+            log.info(task.getUid());
             task.setDate(new Date());
             task.setName(taskConfiguration.getName());
             task.setVersion(taskConfiguration.getVersion());
@@ -99,10 +102,7 @@ public class TaskConfigurationService {
             }catch (Exception e){
 
             }
-
-
-
-
+            log.info(task.getUid());
             task.setDataProcessings(taskConfiguration.getDataProcessings());
             task.setControlConditions(taskConfiguration.getConditions());
             if(taskConfiguration.getDataLinks()!=null){
@@ -117,7 +117,6 @@ public class TaskConfigurationService {
             task.setUserName(userName);
             //数据库插入记录
             String id = taskDao.insert(task).getId();
-
             TaskLoopHandler taskLoopHandler = new TaskLoopHandler(task);
             new Thread(taskLoopHandler).start();
 
@@ -129,9 +128,10 @@ public class TaskConfigurationService {
         return taskId.toString();
     }
 
-    public JSONObject checkTaskStatus(String taskId){
+    public JSONObject checkTaskStatus(String taskId) throws IOException, URISyntaxException {
         Task task = taskDao.findTaskByTaskId(taskId);
-
+        TaskLoop taskLoop = new TaskLoop(task.getUserName());
+        taskLoop.finalCheck(task);
         JSONObject result = new JSONObject();
         int status = task.getStatus();
         switch (status){
@@ -165,7 +165,7 @@ public class TaskConfigurationService {
             taskInfo.put("models",task.getModels());
             taskInfo.put("modelActions",task.getModelActions());
             taskInfo.put("modelActionList",actionList.get("model"));
-            taskInfo.put("processingList",actionList.get("processing"));
+            taskInfo.put("dataProcessingList",actionList.get("processing"));
             taskInfo.put("date",task.getDate());
             taskInfo.put("finish",task.getFinish());
             taskInfo.put("iterationCount",task.getIterationCount());

@@ -25,14 +25,9 @@ spring:
       password: task123
   profiles:
     active: dev
+#    active: prod
   cache:
     type: simple
-  servlet:
-    multipart:
-      max-file-size: 1000MB
-      max-request-size: 1000MB
-#      location: /home/portal/ManagerServer/DemoData/
-      location: F:/managerServer/Temp
   thymeleaf:
     prefix: classpath:/templates/
     suffix: .html
@@ -44,12 +39,14 @@ spring:
     static-path-pattern: /**
 
 prop:
-#  upload-folder: /home/portal/ManagerServer/DemoData/
-#  package-folder: /home/portal/ManagerServer/geo_model/
-#  task-upload: /home/portal/ManagerServer/task/
-  upload-folder: F:/summer2/a/upload
-  package-folder: F:/summer2/a/geo_model
-  task-upload: F:/summer2/a/task
+  upload-folder: /home/portal/ManagerServer/DemoData/
+  package-folder: /home/portal/ManagerServer/geo_model/
+  task-upload: /home/portal/ManagerServer/task/
+#  upload-folder: F:/summer2/a/upload
+#  package-folder: F:/summer2/a/geo_model
+#  task-upload: F:/summer2/a/task
   managerServerIpAndPort: 127.0.0.1:8084
 
+#logging:
+#  path: /home/portal/ManagerServer/log
 

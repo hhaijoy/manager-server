@@ -30,7 +30,7 @@ public class Task {
     private String name;
     private String version;
     private List<Model> models;
-    private List<ModelAction> ModelActions;
+    private List<ModelAction> modelActions;
     private List<ModelAction> i_modelActions;//标识要迭代的模型步骤
     private List<DataProcessing> dataProcessings;
     private List<ControlCondition> controlConditions;
