@@ -544,6 +544,7 @@ public class TaskLoop {
                                     int ProcessingStatus = convertStatus(t_status);
                                     //对状态进行判断，运行成功和失败
                                     if (ProcessingStatus == 1) {
+                                        dataProcessing.setStatus(1);
                                         String outputArrString = jData.getString("outputArrString");
                                         String downloadUrlString = jData.getString("downloadUrlString");
                                         String outputIdString = jData.getString("outputIdString");
