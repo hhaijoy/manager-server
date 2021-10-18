@@ -20,5 +20,5 @@ public class TaskResultDTO {
     int status; // Inited: 0, Started: 1; Finished: 2, Error: -1
     List<ExDataDTO> inputs;
     List<ExDataDTO> outputs;
-
+    String oid;
 }
