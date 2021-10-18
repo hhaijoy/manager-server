@@ -11,6 +11,9 @@ public class ActionParam implements Serializable {
     @JacksonXmlProperty(localName = "id", isAttribute = true)
     private String id;
 
+    @JacksonXmlProperty(localName = "event", isAttribute = true)
+    private String event;
+
     @JacksonXmlProperty(localName = "value", isAttribute = true)
     private String value;
 

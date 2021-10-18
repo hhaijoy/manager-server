@@ -16,19 +16,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dom4j.DocumentException;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Array;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Condition;
 
 import com.example.demo.dao.TaskDao;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.expression.spel.ast.Operator;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.scheduling.annotation.AsyncResult;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.client.RestTemplate;
 import sun.security.x509.AttributeNameEnumeration;
 
 import javax.validation.constraints.Null;
@@ -41,6 +53,8 @@ import static com.example.demo.utils.MyFileUtils.getValueFromFile;
  * 2020.8.21
  */
 public class TaskLoop {
+    @Value("111.229.14.128:8898")
+    private String dataServerIp = "111.229.14.128:8898";
 
     public static String MANAGERSERVER = "127.0.0.1:8084/GeoModeling";
     public static String DATACONVERTSERVER = "127.0.0.1:8084/GeoModeling";
@@ -221,7 +235,7 @@ public class TaskLoop {
                     }
                 }else if(dataProcessing.getType().equals("dataService")){
                     if(checkDataServicePrepared(dataProcessing)){
-                        futures.add(dataServiceTask.getDataServiceResult(dataProcessing,0,task));
+                        runProcessing(dataProcessing);
                     }
                 }
             }
@@ -292,6 +306,140 @@ public class TaskLoop {
         }
     }
 
+    private void runProcessing(DataProcessing dataProcessing) throws IOException {
+        String baseUrl = "http://"+dataServerIp;
+
+        String token = dataProcessing.getToken();
+        String service = dataProcessing.getService();
+
+        String data = null;
+        List<DataTemplate> inputs = dataProcessing.getInputData().getInputs();
+        List<DataTemplate> outputs = dataProcessing.getOutputData().getOutputs();
+        List<ActionParam> params = new ArrayList<>();
+        if(dataProcessing.getInputData().getParams()!=null){
+            params = dataProcessing.getInputData().getParams();
+        }
+
+        JSONObject urls = new JSONObject();
+        for(int i=0;i<inputs.size();i++){
+            data = inputs.get(i).getDataContent().getValue();
+            urls.put(inputs.get(i).getEvent(),data);
+        }
+        JSONObject outputsConfig = new JSONObject();
+        for(int i=0;i<outputs.size();i++){
+            if(outputs.get(i).getDataContent()!=null
+                    &&outputs.get(i).getDataContent().getType()!=null
+                    &&outputs.get(i).getDataContent().getType().equals("insituData"))
+            {
+                outputsConfig.put(outputs.get(i).getEvent(),false);
+            }
+        }
+
+        JSONObject paramsArr = new JSONObject();
+        for(int i=0;i<params.size();i++){
+            String value = params.get(i).getValue();
+            paramsArr.put(params.get(i).getEvent(),value);
+        }
+
+        RestTemplate restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(6000);// 设置超时
+        requestFactory.setReadTimeout(6000);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Type", "application/json");
+
+        MultiValueMap<String, Object> requestBody = new LinkedMultiValueMap<>();
+        requestBody.add("token", URLEncoder.encode(token));
+        requestBody.add("serviceId",service);
+        requestBody.add("inputArr",urls);
+        if(!paramsArr.isEmpty()){
+            requestBody.add("paramsArr",paramsArr);
+        }
+        requestBody.add("outputArr",outputsConfig);
+        HttpEntity<MultiValueMap> requestEntity = new HttpEntity<MultiValueMap>(requestBody, headers);
+        String url = baseUrl + "/invokeLocally";
+        String result = null;
+
+        Map<String,String> header = new HashMap<>();
+        header.put("Content-Type", "application/json");
+
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("token", URLEncoder.encode(token));
+        jsonObject.put("serviceId", service);
+        jsonObject.put("inputArr",urls);
+        if(!paramsArr.isEmpty()){
+            jsonObject.put("paramsArr",paramsArr);
+        }
+        jsonObject.put("outputArr",outputsConfig);
+        try{
+            result = MyHttpUtils.POSTWithJSON(url,"UTF-8",header,jsonObject);
+        }catch (Exception e){
+            dataProcessing.setStatus(0);
+            dataProcessing.setRemark("running");
+            dataProcessing.setRunTimes(dataProcessing.getRunTimes()+1);
+            if(dataProcessing.getRunTimes()==5){//超时、不在线超过5次，视为失败
+                dataProcessing.setStatus(-1);
+            }
+            dataProcessing.setStatus(-1);
+
+            return;
+        }
+//        params.put("params","Processing");
+        JSONObject j_result =  JSONObject.parseObject(result);
+        int code = j_result.getInteger("code");
+
+        dataProcessing.setStatus(0);
+        dataProcessing.setRemark("running");
+        dataProcessing.setRunTimes(dataProcessing.getRunTimes()+1);
+
+        if(code==-1){
+            dataProcessing.setRemark("offLine");
+            if(dataProcessing.getRunTimes()==5){
+                dataProcessing.setStatus(-1);
+            }
+        }else if(code==0){
+            JSONObject dataRespose = j_result.getJSONObject("data");
+
+            String status = dataRespose.getString("status");
+            String taskId = dataRespose.getString("recordId");
+            dataProcessing.setTaskId(taskId);
+
+            if(status.equals("success")){
+                dataProcessing.setRemark("completed");
+                dataProcessing.setStatus(1);
+                JSONObject dataResult = new JSONObject();
+                String outputArrString = dataRespose.getString("outputArrString");
+                String downloadUrlString = dataRespose.getString("downloadUrlString");
+                String outputIdString = dataRespose.getString("outputIdString");
+                JSONObject j_outputArr = JSONObject.parseObject(outputArrString);
+                JSONObject j_downloadUrl = JSONObject.parseObject(downloadUrlString);
+                JSONObject j_outputId = JSONObject.parseObject(outputIdString);
+
+
+                List<DataTemplate> runOutputs = dataProcessing.getOutputData().getOutputs();
+
+                j_outputArr.forEach((key,value)->{
+                    for(DataTemplate output:outputs){
+                        if(key.equals(output.getEvent())){
+                            if((Boolean) value){
+                                output.getDataContent().setValue(j_downloadUrl.getString(key));
+                            }else{
+                                output.getDataContent().setValue(j_outputId.getString(key));
+                            }
+//                            output.getDataContent().setValue((String) value);
+
+                        }
+                    }
+                });
+
+            }
+
+
+
+        }
+    }
+
     private List<ExDataDTO> TemplateToExData(List<DataTemplate> dataTemplates){
         List<ExDataDTO> exDataDTOList = new ArrayList<>();
         for (int i = 0; i < dataTemplates.size(); i++) {
@@ -307,6 +455,7 @@ public class TaskLoop {
         return exDataDTOList;
     }
 
+    //检查集成任务中的所有任务状态
     public Map<String,Object> checkActions(Task task) throws IOException, URISyntaxException {
         Map<String,Object> result = new HashMap<>();
         List<DataProcessing> dataProcessingList = task.getDataProcessings();
@@ -383,8 +532,56 @@ public class TaskLoop {
                         addToSharedData(dataProcessing,task);
                         completedProcessing.add(dataProcessing);
                     }else if(dataProcessing.getStatus()==0){
-                        if(dataProcessing.getRemark()!=null&&dataProcessing.getRemark().equals("running")){
-                            runningProcessing.add(dataProcessing);
+                        if(dataProcessing.getTaskId()!=null){//有taskid属性，模型任务已经推入taskserver，则去检查状态
+                            JSONObject taskResultResponse = checkAction(dataProcessing);
+
+                            if(taskResultResponse.getInteger("code")==0){
+                                JSONObject jData = taskResultResponse.getJSONObject("data");
+                                if(jData == null){
+                                    throw new IOException("task Server Error");
+                                }else{
+                                    String t_status = jData.getString("status");
+                                    int ProcessingStatus = convertStatus(t_status);
+                                    //对状态进行判断，运行成功和失败
+                                    if (ProcessingStatus == 1) {
+                                        String outputArrString = jData.getString("outputArrString");
+                                        String downloadUrlString = jData.getString("downloadUrlString");
+                                        String outputIdString = jData.getString("outputIdString");
+                                        JSONObject j_outputArr = JSONObject.parseObject(outputArrString);
+                                        JSONObject j_downloadUrl = JSONObject.parseObject(downloadUrlString);
+                                        JSONObject j_outputId = JSONObject.parseObject(outputIdString);
+
+                                        List<DataTemplate> runOutputs = dataProcessing.getOutputData().getOutputs();
+
+                                        j_outputArr.forEach((key,value)->{
+                                            for(DataTemplate output:runOutputs){
+                                                if(key.equals(output.getEvent())){
+                                                    if((Boolean) value){
+                                                        output.getDataContent().setValue(j_downloadUrl.getString(key));
+                                                    }else{
+                                                        output.getDataContent().setValue(j_outputId.getString(key));
+                                                    }
+//                            output.getDataContent().setValue((String) value);
+
+                                                }
+                                            }
+                                        });
+
+                                        completedProcessing.add(dataProcessing);
+
+                                    } else if(ProcessingStatus == -1||ProcessingStatus == 2){
+                                        dataProcessing.setStatus(2);
+                                        failedProcessing.add(dataProcessing);
+                                    }else if(ProcessingStatus == 0){
+                                        runningProcessing.add(dataProcessing);
+                                    }
+                                }
+                            }else{
+                                //返回result为err，说明taskServer可能出问题了，因为查询不到记录,往外面抛出错误
+                                dataProcessing.setStatus(2);
+                                failedProcessing.add(dataProcessing);
+                                throw new IOException("task Server Error");
+                            }
                         }else{
                             waitingProcessing.add(dataProcessing);
                         }
@@ -527,14 +724,37 @@ public class TaskLoop {
         return result;
     }
 
+
+    //请求容器检查任务状态
     public JSONObject checkAction(Action action) throws IOException, URISyntaxException {
         String taskId = action.getTaskId();
-        String taskIp = action.getTaskIp();
-        int port = action.getPort();
-        String taskQueryUrl = "http://" + taskIp + ":" + port + "/task/" + taskId;
+        if(action instanceof ModelAction){
+            String taskIp = action.getTaskIp();
+            int port = action.getPort();
+            String taskQueryUrl = "http://" + taskIp + ":" + port + "/task/" + taskId;
 
-        String taskResult = MyHttpUtils.GET(taskQueryUrl, "UTF-8",null);
-        return JSONObject.parseObject(taskResult);
+            String taskResult = MyHttpUtils.GET(taskQueryUrl, "UTF-8",null);
+            return JSONObject.parseObject(taskResult);
+        }else{
+            String baseUrl = "http://111.229.14.128:8898/record";
+            DataProcessing dataProcessing = (DataProcessing) action;
+            String token = dataProcessing.getToken();
+            String recordId = dataProcessing.getTaskId();
+            String url = baseUrl + "?recordId=" + recordId + "&token=" + URLEncoder.encode(token);
+            try {
+                String taskResult = MyHttpUtils.GET(url, "UTF-8",null);
+                if(JSONObject.parseObject(taskResult).getInteger("code")==-1){
+                    System.out.println(JSONObject.parseObject(taskResult));
+                }
+                return JSONObject.parseObject(taskResult);
+            }catch (Exception e){
+                JSONObject errObject = new JSONObject();
+                errObject.put("code",-1);
+                return errObject;
+            }
+
+        }
+
     }
 
     public void judgeCondition(ControlCondition controlCondition){
@@ -748,18 +968,24 @@ public class TaskLoop {
 
     private void addToSharedData(Action completeAction, Task task ){//把结果加入共享文件组，已加过的模型不再加
         List<DataTemplate> outputData = completeAction.getOutputData().getOutputs();
+        String actionId = completeAction.getId();
+        if(sharedOutput==null){
+            sharedOutput = new ConcurrentHashMap<>();
+        }
         for(int i=0;i<outputData.size();i++){
+            String dataId = outputData.get(i).getDataId();
             if(sharedOutput != null){
                 if(sharedOutput.containsKey(outputData.get(i).getDataId())){
                     break;
                 }else{
-                    ShareData shareData = new ShareData(outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
+                    ShareData shareData = new ShareData(actionId, dataId,outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
                     sharedOutput.put(outputData.get(i).getDataId(),shareData);
                 }
-            }else{
-                ShareData shareData = new ShareData(outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
-                sharedOutput.put(outputData.get(i).getDataId(),shareData);
             }
+//            else{
+//                ShareData shareData = new ShareData(actionId, dataId,outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
+//                sharedOutput.put(outputData.get(i).getDataId(),shareData);
+//            }
 
         }
 
@@ -767,9 +993,14 @@ public class TaskLoop {
 
     private void addToTempData(ModelAction modelAction){
         List<DataTemplate> outputData = modelAction.getOutputData().getOutputs();
+        String actionId = modelAction.getId();
+        if(tempOutput==null){
+            tempOutput = new ConcurrentHashMap<>();
+        }
         for(int i=0;i<outputData.size();i++){
+            String dataId = outputData.get(i).getDataId();
             if(tempOutput != null){//添加临时文件池，上次迭代的结果要覆盖
-                ShareData shareData = new ShareData(outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
+                ShareData shareData = new ShareData(actionId,dataId,outputData.get(i).getDataContent().getValue(),outputData.get(i).getDataContent().getType());
                 tempOutput.put(outputData.get(i).getDataId(),shareData);
             }
         }
@@ -777,10 +1008,10 @@ public class TaskLoop {
 
     private int convertStatus(String taskStatus){
         int status;
-        if(taskStatus.equals("Inited") || taskStatus.equals("Started")){
+        if(taskStatus.equals("Inited") || taskStatus.equals("Started") || taskStatus.equals("run")){
             //任务处于开始状态
             status = 0;
-        }else if(taskStatus.equals("Finished")){
+        }else if(taskStatus.equals("Finished")||taskStatus.equals("success")){
             status = 1;
         }else {
             status = -1;
@@ -920,6 +1151,26 @@ public class TaskLoop {
 
     }
 
+    public String uploadDataProcessingOutput(String token,String dataId){
+        String url = "http://"+dataServerIp +"/uploadData";
+        JSONObject params = new JSONObject();
+        params.put("token",token);
+        params.put("dataId",dataId);
+
+        RestTemplate restTemplate = new RestTemplate();
+        JSONObject j_result = restTemplate.postForObject(url,params,JSONObject.class);
+
+        int code = j_result.getInteger("code");
+        String downloadUrl = null;
+        if(code==-1){
+            downloadUrl = "error";
+        }else {
+            downloadUrl = j_result.getJSONObject("message").getString("downloadUrl");
+        }
+
+        return downloadUrl;
+    }
+
     /**
      * 将output填入需要的input中，如果是多输出还要新建model，数据转换则调用
      * @param template
@@ -932,6 +1183,7 @@ public class TaskLoop {
         if(modelAction instanceof ModelAction){
             modelAction = (ModelAction)modelAction;
             md5 = ((ModelAction) modelAction).getMd5();
+            //String type
         }else if(modelAction instanceof DataProcessing){
 
         }

@@ -9,7 +9,7 @@ import java.io.Serializable;
 public class DataContent implements Serializable {
 
     @JacksonXmlProperty(localName = "type", isAttribute = true)
-    private String type;//url link param
+    private String type;//url link param insituData
 
     @JacksonXmlProperty(localName = "value", isAttribute = true)
     private String value;//根据type的值
@@ -20,4 +20,5 @@ public class DataContent implements Serializable {
     private String fileName;
 
     private String suffix;
+
 }
