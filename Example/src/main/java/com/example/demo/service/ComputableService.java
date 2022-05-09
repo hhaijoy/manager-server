@@ -18,6 +18,7 @@ import com.example.demo.sdk.*;
 import com.example.demo.utils.MyFileUtils;
 import com.example.demo.utils.MyHttpUtils;
 import org.apache.commons.codec.DecoderException;
+import org.springframework.http.HttpEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
@@ -364,6 +366,9 @@ public class ComputableService {
     }
 
 
+
+
+
     public JSONObject invokeModel(TaskServiceDTO taskServiceDTO){
         //利用taskServiceDTO拼凑提交任务的form表单，从而提交任务
         String ip = taskServiceDTO.getIp();
@@ -383,8 +388,12 @@ public class ComputableService {
         String actionUrl = "http://" + ip + ":" + port + "/task";
         JSONObject result = new JSONObject();
 
+//        RestTemplate restTemplate = new RestTemplate();
+//        HttpEntity<JSONObject> httpEntity = new HttpEntity<>(params);
+
         try{
             String resJson = MyHttpUtils.POSTWithJSON(actionUrl,"UTF-8",null,params);
+//            String resJson = restTemplate.postForObject(actionUrl,null,String.class,httpEntity);
             JSONObject jResponse = JSONObject.parseObject(resJson);
             if(jResponse.getString("result").equals("suc")){
                 String tid = jResponse.getString("data");
@@ -550,6 +559,12 @@ public class ComputableService {
             }
         }
         return outputItems;
+    }
+
+    public boolean checkDeplyed(String md5){
+        List<TaskNodeReceiveDTO> taskNodeList = taskNodeService.listAll();
+
+        return true;
     }
 
 }

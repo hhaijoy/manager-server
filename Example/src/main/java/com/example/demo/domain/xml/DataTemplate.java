@@ -24,7 +24,7 @@ public class DataTemplate implements Serializable {
     private String dataId;
 
     @JacksonXmlProperty(localName = "Data")
-    private DataContent dataContent = new DataContent();
+    private DataContent dataContent = new DataContent();//输入输出的内容
 
     private String[] mutiFile;
     //标记这个数据是否已经准备好,设置默认值

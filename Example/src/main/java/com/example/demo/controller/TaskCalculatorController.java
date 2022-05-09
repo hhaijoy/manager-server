@@ -15,6 +15,9 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+
 
 /**
  * 计算任务提交类
@@ -72,7 +75,7 @@ public class TaskCalculatorController {
      * @return
      */
     @RequestMapping(value = "/runTask", method = RequestMethod.POST,produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
-    @ApiOperation(value = "提交模型运行任务")
+    @ApiOperation(value = "提交集成运行任务")
     JsonResult runTask(@RequestParam("file") MultipartFile file, @RequestParam("userName") String userName){
         if (file.isEmpty()) {
             return ResultUtils.error(-1, "上传的文件为空");
@@ -81,7 +84,7 @@ public class TaskCalculatorController {
             String suffix = fileName.substring(fileName.lastIndexOf(".") + 1, fileName.length());
             //TODO 验证xml文件是否符合标准格式(校验函数待实现)
             if (!suffix.equals("xml") || false){
-                return ResultUtils.error(-1, "上次的文件不是xml或者文件不符合规定");
+                return ResultUtils.error(-1, "上传的文件不是xml或者文件不符合规定");
             }else{
                 //TODO 进行处理
                 String uid = taskConfigurationService.runTask(file, userName);
@@ -102,7 +105,7 @@ public class TaskCalculatorController {
      */
     @RequestMapping(value = "/checkTaskStatus", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ApiOperation(value = "查询集成模型task的运行状况")
-    JsonResult checkTaskStatus(@RequestParam("taskId") String taskId){
+    JsonResult checkTaskStatus(@RequestParam("taskId") String taskId) throws IOException, URISyntaxException {
             return ResultUtils.success(taskConfigurationService.checkTaskStatus(taskId));
     }
 

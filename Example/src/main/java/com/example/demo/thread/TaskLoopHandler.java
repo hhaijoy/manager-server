@@ -5,6 +5,7 @@ import com.example.demo.domain.xml.DataProcessing;
 import com.example.demo.domain.xml.Model;
 import com.example.demo.domain.xml.ModelAction;
 import com.example.demo.utils.TaskLoop;
+import org.dom4j.DocumentException;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -48,6 +49,8 @@ public class TaskLoopHandler implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         } catch (URISyntaxException e) {
+            e.printStackTrace();
+        } catch (DocumentException e) {
             e.printStackTrace();
         }
 

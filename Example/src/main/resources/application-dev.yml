@@ -11,3 +11,12 @@ server:
       - text/xml
       - text/plain
     min-response-size: 1024
+
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 1000MB
+      max-request-size: 1000MB
+      #      location: /home/portal/ManagerServer/DemoData/
+      location: F:/managerServer/Temp

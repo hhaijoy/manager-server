@@ -86,4 +86,15 @@ public class ComputableModelController {
         }
     }
 
+    @RequestMapping(value = "/checkDeployed", method = RequestMethod.GET)
+    @ApiImplicitParam(paramType = "body", dataType = "String", name = "md5", value = "检查是否有该md5对应的模型服务", required = true)
+    @ApiOperation(value = "检查是否有该md5对应的模型服务")
+    public JsonResult checkDeployed(@RequestParam(value="md5") String md5){
+        //首先根据pid找到最适合的Task-Server节点
+        Boolean deployed = computableService.checkDeplyed(md5);
+
+        return ResultUtils.success(deployed);
+
+    }
+
 }

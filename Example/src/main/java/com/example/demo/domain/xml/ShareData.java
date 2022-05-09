@@ -11,7 +11,11 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ShareData {
+public class ShareData {//保存数据详情
+
+    private String actionId;
+
+    private String dataId;
 
     private String value;
 
