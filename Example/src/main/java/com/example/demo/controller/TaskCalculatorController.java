@@ -119,6 +119,13 @@ public class TaskCalculatorController {
         }
     }
 
+    @GetMapping(value = "/updateRunTask/{runTaskId}")
+    @ApiOperation(value = "更新正在运行的记录")
+    JsonResult updateRunTask(@PathVariable String runTaskId, @RequestParam String status){
+        return taskConfigurationService.updateRunTask(runTaskId, status);
+    }
+
+
     @RequestMapping(value="/checkRecord", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ApiOperation(value="检查模型运行状态，并返回数据")
     JsonResult checkRecord(@RequestParam("taskId") String taskId){

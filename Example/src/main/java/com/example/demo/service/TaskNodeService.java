@@ -129,6 +129,7 @@ public class TaskNodeService {
         taskNodeStatusInfo.setPort(taskNodeReceiveDTO.getPort());
         //测试案例所用url
         String url = "http://" + taskNodeReceiveDTO.getHost() + ":" + taskNodeReceiveDTO.getPort() + "/server/status?pid=" + pid;
+        // String url = "http://" + "127.0.0.1" + ":" + "8061" + "/server/status?pid=" + pid;
         String result;
         try{
             result = MyHttpUtils.GET(url,"UTF-8",null);

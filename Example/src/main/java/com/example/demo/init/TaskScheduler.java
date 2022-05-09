@@ -3,6 +3,7 @@ package com.example.demo.init;
 import com.example.demo.DemoApplication;
 import com.example.demo.domain.Scheduler.Task;
 import com.example.demo.thread.TaskHandler;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,12 +14,13 @@ import java.util.concurrent.LinkedBlockingDeque;
  * @Author: wangming
  * @Date: 2019-11-15 15:31
  */
+@Slf4j
 public class TaskScheduler implements Runnable {
     private static ExecutorService threadPool = Executors.newCachedThreadPool();
     LinkedBlockingDeque<Task> linkedBlockingDeque = DemoApplication.linkedBlockingDeque;
     @Override
     public void run() {
-        System.out.println("准备监听任务队列任务");
+        log.info("准备监听任务队列任务");
         while (true){
 //            try{
 //                Task task = linkedBlockingDeque.take();
