@@ -17,6 +17,7 @@ public class GeoTaskServer extends Service {
 
     public Task createTask(String pid, DataServer dataExServer, String userName){
         String url = this.getBaseUrl() + "server?pid=" + pid;
+        // String url = "http://127.0.0.1:8061/" + "server?pid=" + pid;
         try {
             String resJson = MyHttpUtils.GET(url,"UTF-8",null);
             JSONObject jResponse = JSONObject.parseObject(resJson);

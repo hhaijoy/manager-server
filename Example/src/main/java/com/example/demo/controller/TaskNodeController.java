@@ -18,10 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -107,6 +104,7 @@ public class TaskNodeController {
     @ApiOperation(value = "根据模型pid找到最适合的任务服务器节点")
     JsonResult getTaskServerByPid(@PathVariable("pid") String pid){
         List<TaskNodeReceiveDTO> taskNodeList = taskNodeService.listAll();
+        // taskNodeList = new ArrayList<>(Arrays.asList(taskNodeList.get(0)));
         List<Future<TaskNodeStatusInfo>> futures = new ArrayList<>();
         //开启异步任务
         taskNodeList.forEach((TaskNodeReceiveDTO obj) ->{
