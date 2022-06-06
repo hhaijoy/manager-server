@@ -4,13 +4,18 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.example.demo.DemoApplication;
+import com.example.demo.bean.JsonResult;
+import com.example.demo.dao.RunTaskDao;
 import com.example.demo.dao.TaskDao;
 import com.example.demo.domain.ModelContainer;
 import com.example.demo.domain.Scheduler.Task;
 import com.example.demo.domain.support.TaskNodeStatusInfo;
 import com.example.demo.domain.xml.*;
 import com.example.demo.dto.taskNode.TaskNodeReceiveDTO;
+import com.example.demo.entity.RunTask;
 import com.example.demo.thread.TaskLoopHandler;
+import com.example.demo.utils.ResultUtils;
+import com.example.demo.utils.StatusTransferUtils;
 import com.example.demo.utils.TaskLoop;
 import com.example.demo.utils.XmlParseUtils;
 //import com.sun.xml.internal.ws.api.ha.StickyFeature;
@@ -40,6 +45,9 @@ public class TaskConfigurationService {
 
     @Autowired
     ComputableService computableService;
+
+    @Autowired
+    RunTaskDao runTaskDao;
 
     private static final Logger log = LoggerFactory.getLogger(TaskConfigurationService.class);
 
@@ -215,4 +223,21 @@ public class TaskConfigurationService {
     }
 
 
+    public JsonResult updateRunTask(String runTaskId, String status) {
+        RunTask runTask = runTaskDao.findFirstByRunTaskId(runTaskId);
+
+        if (runTask == null)
+            return ResultUtils.error(-1,"no object" );
+
+        int st = StatusTransferUtils.TaskServer2ManagerServer(status);
+
+        runTask.setStatus(st);
+
+        runTaskDao.save(runTask);
+
+        // System.out.println(status);
+
+        return ResultUtils.success();
+
+    }
 }

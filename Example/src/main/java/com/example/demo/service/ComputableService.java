@@ -443,10 +443,10 @@ public class ComputableService {
                 int convertedStatus = convertStatus(taskStatus);
                 taskResultDTO.setStatus(convertedStatus);
                 // 更新runTask的状态
-                Query query = Query.query(Criteria.where("runTaskId").is(tid));
-                Update update = new Update();
-                update.set("status",convertedStatus);
-                mongoTemplate.updateFirst(query, update, RunTask.class);
+                // Query query = Query.query(Criteria.where("runTaskId").is(tid));
+                // Update update = new Update();
+                // update.set("status",convertedStatus);
+                // mongoTemplate.updateFirst(query, update, RunTask.class);
                 taskResultDTO.setPid(jData.getString("t_pid"));
                 List<ExDataDTO> outputItems = new ArrayList<>();
                 if(jData.getJSONArray("t_outputs") != null){
