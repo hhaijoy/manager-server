@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
 
 import java.util.Date;
 import java.util.List;
@@ -35,9 +36,13 @@ public class Task {
     private List<DataProcessing> dataProcessings;
     private List<ControlCondition> controlConditions;
 
+    private List<Iteration> iterations;
+
     private int status; // 0-started, 1 - finished, -1 - failed
 
-    private Map<String, DataLink> dataLink;
+    private Map<String,List<DataLink>> dataLinks;//k:目的数据
+
+    private Map<String, List<DataLink>> reDataLinks;//k:出发地数据
 
     private Map<String,Integer> iterationCount;
 

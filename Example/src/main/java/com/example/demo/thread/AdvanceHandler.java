@@ -188,15 +188,15 @@ public class AdvanceHandler {
 
     //更新数据到concurrentHashMap中
     private void updateOutputToGlobalMap(int index){
-        List<DataTemplate> outputs = this.modelList.get(index).getOutputData().getOutputs();
-        for (DataTemplate output : outputs) {
-            if (!output.getDataContent().getValue().equals("")){
-                ShareData shareData = new ShareData();
-                shareData.setValue(output.getDataContent().getValue());
-                shareData.setType(output.getDataContent().getType());
-                this.sharedMap.put(output.getDataId(),shareData);
-            }
-        }
+//        List<DataTemplate> outputs = this.modelList.get(index).getOutputData().getOutputs();
+//        for (DataTemplate output : outputs) {
+//            if (!output.getDataContent().getValue().equals("")){
+//                ShareData shareData = new ShareData();
+//                shareData.setValue(output.getDataContent().getValue());
+//                shareData.setType(output.getDataContent().getType());
+//                this.sharedMap.put(output.getDataId(),shareData);
+//            }
+//        }
     }
 
     // 将从TaskServer得到的模型运行记录(输出结果信息)更新到原文档中
@@ -269,7 +269,7 @@ public class AdvanceHandler {
 //                        template.setMutiFile(urls);
 //                    }
 //                    else{
-                        template.getDataContent().setValue(sharedMap.get(value).getValue());
+//                        template.getDataContent().setValue(sharedMap.get(value).getValue());
                         template.getDataContent().setType(sharedMap.get(value).getType());
                         template.setPrepared(true);
 //                    }

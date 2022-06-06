@@ -13,11 +13,11 @@ public class DataLink {
     @JacksonXmlProperty(localName = "to", isAttribute = true)
     private String to;
 
-//    @JacksonXmlProperty(localName = "source", isAttribute = true)
-//    private String source;
-//
-//    @JacksonXmlProperty(localName = "target", isAttribute = true)
-//    private String target;
+    @JacksonXmlProperty(localName = "source", isAttribute = true)
+    private String source;//对应actionId
+
+    @JacksonXmlProperty(localName = "target", isAttribute = true)
+    private String target;//对应actionId
 
 //    @JacksonXmlProperty(localName = "tool", isAttribute = true)
 //    private String tool;

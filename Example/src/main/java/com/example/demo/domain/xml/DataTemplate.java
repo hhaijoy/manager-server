@@ -18,7 +18,7 @@ public class DataTemplate implements Serializable {
     @JacksonXmlProperty(localName = "event", isAttribute = true)
     private String event;
 
-    private String link;
+    private String link;//单链接情况
 
     @JacksonXmlProperty(localName = "id", isAttribute = true)
     private String dataId;
@@ -28,5 +28,5 @@ public class DataTemplate implements Serializable {
 
     private String[] mutiFile;
     //标记这个数据是否已经准备好,设置默认值
-    private boolean isPrepared = false;
+    private Boolean prepared = false;
 }

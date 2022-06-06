@@ -4,7 +4,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.Data;
 
 @Data
-public class ConditionCase {
+public class ConditionCase  {
 
     private String orderId;
 
@@ -15,6 +15,6 @@ public class ConditionCase {
     private String standard;//判断标准
 
     @JacksonXmlProperty(localName = "relation",isAttribute = true)
-    private String relation;//and or
+    private String relation;//与顺序下一个的case的关系 and or
 
 }

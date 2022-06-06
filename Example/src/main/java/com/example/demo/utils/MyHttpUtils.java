@@ -40,7 +40,7 @@ public class MyHttpUtils {
 
     //设置获取数据的超时时间(即响应时间),单位毫秒
 
-    private static final int SOCKET_TIMEOUT = 10000;
+    private static final int SOCKET_TIMEOUT = 15000;
 
     public static String GET(String urlString, String encode, Map<String, String> headers, String... m)throws IOException, URISyntaxException{
         String body = "";

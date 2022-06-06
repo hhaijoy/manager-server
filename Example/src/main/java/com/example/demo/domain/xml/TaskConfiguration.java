@@ -49,6 +49,10 @@ public class TaskConfiguration {
     @JacksonXmlElementWrapper(localName = "DataLinks")
     private LinkedList<DataLink> dataLinks;
 
+    @JacksonXmlProperty(localName = "Iteration")
+    @JacksonXmlElementWrapper(localName = "Iterations")
+    private LinkedList<Iteration> iterations;
+
 
     @Id
     private String id;

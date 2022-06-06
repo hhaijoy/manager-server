@@ -20,9 +20,6 @@ public class ModelAction extends Action implements Serializable {
     @JacksonXmlProperty(localName = "order", isAttribute = true)
     private String order;//同一个模型对应的两个action不同
 
-    @JacksonXmlProperty(localName = "iterationNum", isAttribute = true)
-    private int iterationNum = 1;
-
     @JacksonXmlProperty(localName = "step", isAttribute = true)
     private int step ;
 

@@ -22,6 +22,7 @@ public class DataProcessing extends Action implements Serializable {
 
     private String remark;//因为dataservice不想加状态接口，只能这么搞
 
-    private int runTimes=0;//因为dataservice不想加状态接口，只能这么搞
 
+
+    private String description;
 }

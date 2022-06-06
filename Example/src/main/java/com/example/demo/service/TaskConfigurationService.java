@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -74,11 +75,10 @@ public class TaskConfigurationService {
 
     public String runTask(MultipartFile file, String userName){
         UUID taskId = UUID.randomUUID();
-        log.info("}}}}}}}"+taskId.toString());
         //解析xml文档
         try {
             TaskConfiguration taskConfiguration = XmlParseUtils.parseXmlBaseOnStream(file.getInputStream(),"UTF-8");
-            //TODO 验证文档中是否存在具体的模型服务
+            //验证文档中是否存在具体的模型服务
             Task task = new Task();
             task.setUid(taskConfiguration.getUid());
             log.info(task.getUid());
@@ -105,18 +105,30 @@ public class TaskConfigurationService {
             log.info(task.getUid());
             task.setDataProcessings(taskConfiguration.getDataProcessings());
             task.setControlConditions(taskConfiguration.getConditions());
+            task.setIterations(taskConfiguration.getIterations());
             if(taskConfiguration.getDataLinks()!=null){
-                Map<String,DataLink> dataLinkMap = new HashMap<>();
+                Map<String,List<DataLink>> dataLinkMap = new HashMap<>();
+                Map<String,List<DataLink>> reDataLinkMap = new HashMap<>();
                 for(DataLink dataLink:taskConfiguration.getDataLinks()){
-                    dataLinkMap.put(dataLink.getTo(),dataLink);//to在前，便于后面以input为基准进行索引
+
+                    List<DataLink> dataLinks = new ArrayList<>();
+                    if(dataLinkMap.get(dataLink.getTo())!=null){
+                        dataLinks = dataLinkMap.get(dataLink.getTo());
+                    }
+                    dataLinks.add(dataLink);
+
+                    dataLinkMap.put(dataLink.getTo(),dataLinks);//to在前，便于后面以input为基准进行索引
+                    reDataLinkMap.put(dataLink.getFrom(),dataLinks);//from为索引，便于寻找上游元素
                 }
-                task.setDataLink(dataLinkMap);
+                task.setDataLinks(dataLinkMap);
+                task.setReDataLinks(reDataLinkMap);
             }
 
             task.setTaskId(taskId.toString());
             task.setUserName(userName);
             //数据库插入记录
             String id = taskDao.insert(task).getId();
+
             TaskLoopHandler taskLoopHandler = new TaskLoopHandler(task);
             new Thread(taskLoopHandler).start();
 
@@ -129,6 +141,7 @@ public class TaskConfigurationService {
     }
 
     public JSONObject checkTaskStatus(String taskId) throws IOException, URISyntaxException {
+        Object task1 = taskDao.findTaskByTaskId(taskId);
         Task task = taskDao.findTaskByTaskId(taskId);
         TaskLoop taskLoop = new TaskLoop(task.getUserName());
         taskLoop.finalCheck(task);
